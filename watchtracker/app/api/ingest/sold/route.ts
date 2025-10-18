@@ -14,7 +14,11 @@ export async function POST(req: NextRequest) {
   }
 
   const backfill = req.nextUrl.searchParams.get('backfill') === '1';
-  const cutoff = backfill ? new Date(Date.now() - 90 * 24 * 3600 * 1000) : new Date(Date.now() - 6 * 3600 * 1000);
+  const sinceDaysParam = req.nextUrl.searchParams.get('sinceDays');
+  const sinceDays = backfill
+    ? Math.max(1, Number(sinceDaysParam || '90'))
+    : 0.25; // ~6 hours for non-backfill runs
+  const cutoff = new Date(Date.now() - sinceDays * 24 * 3600 * 1000);
   const maxPages = Math.max(1, Number(req.nextUrl.searchParams.get('maxPages') || (backfill ? '5' : '2')));
   const only = req.nextUrl.searchParams.get('only'); // CSV of brand:ref
 
