@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "node scripts/seed.mjs"
+    "seed": "node scripts/seed.mjs",
+    "vercel:env:push": "bash scripts/push-vercel-envs.sh .env"
   },
   "dependencies": {
     "@prisma/client": "^5.9.1",
