@@ -1,0 +1,91 @@
+// Switch provider to postgresql for prod and set DATABASE_URL accordingly
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Model {
+  id          String   @id @default(cuid())
+  brand       String
+  family      String?
+  ref         String
+  displayName String
+  keywords    String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  listings SoldListing[]
+  metrics  ModelMetric[]
+
+  @@unique([brand, ref])
+  @@index([brand, family, ref])
+}
+
+model SoldListing {
+  itemId         String  @id
+  title          String
+  categoryId     String?
+  brand          String?
+  family         String?
+  ref            String?
+  condition      String?
+  sellerUsername String?
+  sellerFeedback Int?
+  price          Decimal
+  currency       String
+  priceUsd       Decimal
+  shippingCost   Decimal?
+  country        String?
+  endTimeUtc     DateTime
+  sellingState   String
+  url            String
+  imageUrl       String?
+  fullSet        Boolean @default(false)
+  raw            Json
+  ingestedAt     DateTime @default(now())
+
+  modelId String?
+  model   Model?  @relation(fields: [modelId], references: [id])
+
+  @@index([endTimeUtc])
+  @@index([brand, ref, endTimeUtc])
+}
+
+model ModelMetric {
+  id         String   @id @default(cuid())
+  modelId    String
+  model      Model    @relation(fields: [modelId], references: [id])
+  window     String   // '30d' | '90d'
+  mean       Decimal
+  median     Decimal
+  p25        Decimal
+  p75        Decimal
+  volume     Int
+  momChange  Decimal?
+  yoyChange  Decimal?
+  computedAt DateTime @default(now())
+
+  @@index([modelId, window, computedAt])
+}
+
+model WatchList {
+  id        String   @id @default(cuid())
+  clientKey String
+  modelId   String
+  createdAt DateTime @default(now())
+  @@unique([clientKey, modelId])
+}
+
+model TrendAlert {
+  id           String  @id @default(cuid())
+  clientKey    String
+  modelId      String
+  thresholdPct Decimal
+  direction    String
+  active       Boolean @default(true)
+  createdAt    DateTime @default(now())
+}
