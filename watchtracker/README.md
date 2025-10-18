@@ -37,8 +37,14 @@ Visit `http://localhost:3000`.
 ## eBay Marketplace Account Deletion
 
 - Endpoint (HTTPS): `/api/ebay/marketplace-account-deletion`
-- Env: set `EBAY_MAD_TOKEN` in `.env` and enter the same value in eBay Dev Portal’s “Verification token”.
-- eBay will POST JSON to the endpoint; we store each event in `AccountDeletionEvent` with `tokenValid`.
+- Env:
+  - `EBAY_MAD_TOKEN`: same value you enter in eBay Dev Portal “Verification token” (32–80 chars; A–Z, a–z, 0–9, `_`, `-`)
+  - `EBAY_MAD_ENDPOINT`: the exact HTTPS endpoint you pasted in the Dev Portal
+- Validation handshake (per eBay docs):
+  - eBay sends `GET <endpoint>?challenge_code=...`
+  - We respond `200 application/json` with `{ "challengeResponse": sha256(challenge_code + EBAY_MAD_TOKEN + EBAY_MAD_ENDPOINT) }`
+  - After validation, eBay uses `POST` to deliver notifications
+- We store each POST in `AccountDeletionEvent` and always return 200.
 - Local test:
 
 ```
@@ -49,6 +55,12 @@ curl -X POST http://localhost:3000/api/ebay/marketplace-account-deletion \
 ```
 
 - For eBay’s “Send Test Notification”, deploy to an HTTPS URL (e.g., Vercel) and use that as the endpoint.
+ - Live validation quick test:
+
+```
+curl -sS "https://<your-app>.vercel.app/api/ebay/marketplace-account-deletion?challenge_code=123" | jq .
+# Expect: { "challengeResponse": "<sha256 of 123 + EBAY_MAD_TOKEN + EBAY_MAD_ENDPOINT>" }
+```
  - View received events during development with Prisma Studio:
 
 ```

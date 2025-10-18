@@ -50,9 +50,22 @@ export async function POST(req: NextRequest) {
 }
 
 // Some providers validate via GET. Respond 200 quickly with a simple body.
-export async function GET() {
-  const token = process.env.EBAY_MAD_TOKEN || 'ok';
-  return new NextResponse(token, { status: 200, headers: { 'content-type': 'text/plain' } });
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const challengeCode = url.searchParams.get('challenge_code');
+  const token = process.env.EBAY_MAD_TOKEN || '';
+  const endpoint = process.env.EBAY_MAD_ENDPOINT || '';
+
+  if (challengeCode && token && endpoint) {
+    // Per eBay docs: hash(challengeCode + verificationToken + endpoint) using SHA-256
+    const data = challengeCode + token + endpoint;
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+    const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    return NextResponse.json({ challengeResponse: hex });
+  }
+
+  // Fallback simple OK response for health checks
+  return new NextResponse('ok', { status: 200, headers: { 'content-type': 'text/plain' } });
 }
 
 export async function HEAD() {
