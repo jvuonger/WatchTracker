@@ -15,13 +15,22 @@ export async function POST(req: NextRequest) {
 
   const backfill = req.nextUrl.searchParams.get('backfill') === '1';
   const cutoff = backfill ? new Date(Date.now() - 90 * 24 * 3600 * 1000) : new Date(Date.now() - 6 * 3600 * 1000);
+  const maxPages = Math.max(1, Number(req.nextUrl.searchParams.get('maxPages') || (backfill ? '5' : '2')));
+  const only = req.nextUrl.searchParams.get('only'); // CSV of brand:ref
 
   if (!process.env.EBAY_APP_ID) {
     return NextResponse.json({ ok: false, error: 'missing EBAY_APP_ID env' }, { status: 400 });
   }
 
   try {
-    const models = await prisma.model.findMany();
+    const models = only
+      ? await Promise.all(
+          only.split(',').map(async (pair) => {
+            const [brand, ref] = pair.split(':');
+            return prisma.model.findFirst({ where: { brand, ref } });
+          })
+        ).then((arr) => arr.filter(Boolean) as NonNullable<Awaited<ReturnType<typeof prisma.model.findFirst>>>[])
+      : await prisma.model.findMany();
     let ingested = 0;
     for (const m of models) {
       const keywordsList = (m.keywords && m.keywords.length) ? m.keywords : [`${m.brand} ${m.ref}`];
@@ -44,9 +53,13 @@ export async function POST(req: NextRequest) {
             });
             ingested += 1;
           }
-          const totalPages = Number(data?.findCompletedItemsResponse?.[0]?.paginationOutput?.[0]?.totalPages?.[0] ?? 1);
-          if (page >= totalPages) break;
+          const totalPages = Number(
+            data?.findCompletedItemsResponse?.[0]?.paginationOutput?.[0]?.totalPages?.[0] ?? 1
+          );
+          if (page >= totalPages || page >= maxPages) break;
           page += 1;
+          // small delay to avoid eBay rate limiter
+          await new Promise((r) => setTimeout(r, 350));
         }
       }
     }

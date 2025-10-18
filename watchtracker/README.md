@@ -34,6 +34,30 @@ Visit `http://localhost:3000`.
 - Query `?backfill=1` to sweep up to 90 days.
 - Requires `EBAY_APP_ID`.
 
+### Backfill strategy
+
+- Heavy backfills can hit eBay rate limits and exceed serverless timeouts. Prefer running the local script:
+
+```
+npm run backfill -- --sinceDays=90 --maxPages=20 --only="Rolex:124060,Omega:310.30.42.50.01.001"
+```
+
+- Flags:
+  - `--sinceDays` Days to keep (default 90)
+  - `--maxPages` Max pages per keyword (default 20)
+  - `--only` CSV list of `brand:ref` to restrict scope
+  - `EBAY_ENV` `production` or `sandbox` (default `production`)
+
+- The script throttles requests and backs off on `RateLimiter/10001` errors automatically.
+
+- If you must use the API route, you can limit work per run:
+
+```
+curl -X POST \
+  "https://<your-app>.vercel.app/api/ingest/sold?backfill=1&maxPages=3&only=Rolex:124060" \
+  -H "x-vercel-cron: 1"
+```
+
 ## eBay Marketplace Account Deletion
 
 - Endpoint (HTTPS): `/api/ebay/marketplace-account-deletion`
