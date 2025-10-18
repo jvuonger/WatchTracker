@@ -89,3 +89,15 @@ model TrendAlert {
   active       Boolean @default(true)
   createdAt    DateTime @default(now())
 }
+
+model AccountDeletionEvent {
+  id          String   @id @default(cuid())
+  provider    String   // e.g., 'ebay'
+  tokenValid  Boolean
+  userId      String?
+  username    String?
+  receivedAt  DateTime @default(now())
+  payload     Json
+
+  @@index([provider, receivedAt])
+}

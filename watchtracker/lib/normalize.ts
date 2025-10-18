@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export function normalizeEbayItem(raw: any, model: { id: string; brand: string; family: string | null; ref: string }) {
   const itemId = String(raw?.itemId?.[0] ?? '').trim();
@@ -36,4 +36,3 @@ export function normalizeEbayItem(raw: any, model: { id: string; brand: string; 
   };
   return record as any;
 }
-

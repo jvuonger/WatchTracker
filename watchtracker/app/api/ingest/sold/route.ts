@@ -3,9 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { findCompleted } from '@/lib/ebay';
 import { normalizeEbayItem } from '@/lib/normalize';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   const cronKey = req.headers.get('x-cron-key');
-  if (!process.env.CRON_KEY || cronKey !== process.env.CRON_KEY) {
+  const isVercelCron = req.headers.get('x-vercel-cron') === '1';
+  const hasCronKey = !!process.env.CRON_KEY && cronKey === process.env.CRON_KEY;
+  if (!isVercelCron && !hasCronKey) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 
@@ -43,4 +47,3 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({ ok: true, ingested });
 }
-
