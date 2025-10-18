@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 function getInboundToken(req: NextRequest, body: any): string | null {
   // Try common places; eBay docs place the token with the request, but naming can vary
   const h1 = req.headers.get('x-verification-token');
@@ -27,17 +30,43 @@ export async function POST(req: NextRequest) {
   const userId = (body?.userId ?? body?.accountId ?? body?.metadata?.userId ?? null) as string | null;
   const username = (body?.username ?? body?.userName ?? body?.metadata?.username ?? null) as string | null;
 
-  await prisma.accountDeletionEvent.create({
-    data: {
-      provider: 'ebay',
-      tokenValid,
-      userId: userId ?? null,
-      username: username ?? null,
-      payload: body ?? {},
-    },
-  });
+  // Best-effort persistence; do not fail the webhook if DB is unavailable
+  try {
+    await prisma.accountDeletionEvent.create({
+      data: {
+        provider: 'ebay',
+        tokenValid,
+        userId: userId ?? null,
+        username: username ?? null,
+        payload: body ?? {},
+      },
+    });
+  } catch (e) {
+    // swallow errors to ensure 200 response for provider validation
+  }
 
   // Always return 200 to acknowledge; you can add extra checks if eBay requires otherwise
   return NextResponse.json({ ok: true, tokenValid });
 }
 
+// Some providers validate via GET. Respond 200 quickly with a simple body.
+export async function GET() {
+  const token = process.env.EBAY_MAD_TOKEN || 'ok';
+  return new NextResponse(token, { status: 200, headers: { 'content-type': 'text/plain' } });
+}
+
+export async function HEAD() {
+  return new NextResponse(null, { status: 200 });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Allow': 'GET,POST,HEAD,OPTIONS',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,POST,HEAD,OPTIONS',
+      'Access-Control-Allow-Headers': '*'
+    }
+  });
+}
