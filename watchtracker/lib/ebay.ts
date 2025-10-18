@@ -1,4 +1,4 @@
-const FINDING_API = "https://svcs.sandbox.ebay.com/services/search/FindingService/v1";
+const FINDING_API = "https://svcs.ebay.com/services/search/FindingService/v1";
 
 export async function findCompleted({ keywords, page }: { keywords: string; page: number }) {
   if (!process.env.EBAY_APP_ID) throw new Error('Missing EBAY_APP_ID');
