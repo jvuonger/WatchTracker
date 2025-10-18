@@ -5,6 +5,11 @@ function getFindingApiBase() {
     : 'https://svcs.ebay.com/services/search/FindingService/v1';
 }
 
+// Simple in-process rate limiter to respect per-second caps
+let lastEbayCallAt = 0;
+const MIN_INTERVAL_MS = Number(process.env.EBAY_MIN_INTERVAL_MS || '1200'); // ~1 req/sec default
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export async function findCompleted({ keywords, page }: { keywords: string; page: number }) {
   const appId = process.env.EBAY_APP_ID;
   if (!appId) throw new Error('Missing EBAY_APP_ID');
@@ -22,7 +27,9 @@ export async function findCompleted({ keywords, page }: { keywords: string; page
     'paginationInput.entriesPerPage': '100',
     'paginationInput.pageNumber': String(page),
     'itemFilter(0).name': 'SoldItemsOnly',
-    'itemFilter(0).value': 'true'
+    'itemFilter(0).value': 'true',
+    // Include App ID as a query param to ensure recognition across proxies
+    'SECURITY-APPNAME': appId,
   });
 
   const url = `${base}?${params}`;
@@ -30,8 +37,17 @@ export async function findCompleted({ keywords, page }: { keywords: string; page
     'X-EBAY-SOA-SECURITY-APPNAME': appId,
     'X-EBAY-SOA-OPERATION-NAME': 'findCompletedItems',
     'X-EBAY-SOA-GLOBAL-ID': 'EBAY-US',
+    'X-EBAY-SOA-REQUEST-DATA-FORMAT': 'JSON',
+    'X-EBAY-SOA-RESPONSE-DATA-FORMAT': 'JSON',
     'Accept': 'application/json'
   };
+
+  // Throttle to avoid rate limiting (per App ID per sec)
+  const now = Date.now();
+  const jitter = 50 + Math.floor(Math.random() * 150);
+  const waitFor = lastEbayCallAt + MIN_INTERVAL_MS - now;
+  if (waitFor > 0) await sleep(waitFor + jitter);
+  lastEbayCallAt = Date.now();
 
   const res = await fetch(url, { headers });
   if (!res.ok) {

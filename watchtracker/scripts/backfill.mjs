@@ -15,6 +15,9 @@ function getFindingApiBase() {
 async function findCompleted({ keywords, page }) {
   const appId = process.env.EBAY_APP_ID;
   if (!appId) throw new Error('Missing EBAY_APP_ID');
+  // In-process rate limiter (per App ID per process)
+  globalThis.__ebayLastCallAt = globalThis.__ebayLastCallAt || 0;
+  const MIN_INTERVAL_MS = Number(process.env.EBAY_MIN_INTERVAL_MS || '1200');
   const base = getFindingApiBase();
   const params = new URLSearchParams({
     'OPERATION-NAME': 'findCompletedItems',
@@ -28,15 +31,24 @@ async function findCompleted({ keywords, page }) {
     'paginationInput.entriesPerPage': '100',
     'paginationInput.pageNumber': String(page),
     'itemFilter(0).name': 'SoldItemsOnly',
-    'itemFilter(0).value': 'true'
+    'itemFilter(0).value': 'true',
+    'SECURITY-APPNAME': appId
   });
   const url = `${base}?${params}`;
   const headers = {
     'X-EBAY-SOA-SECURITY-APPNAME': appId,
     'X-EBAY-SOA-OPERATION-NAME': 'findCompletedItems',
     'X-EBAY-SOA-GLOBAL-ID': 'EBAY-US',
+    'X-EBAY-SOA-REQUEST-DATA-FORMAT': 'JSON',
+    'X-EBAY-SOA-RESPONSE-DATA-FORMAT': 'JSON',
     'Accept': 'application/json'
   };
+  // Throttle per call
+  const now = Date.now();
+  const jitter = 50 + Math.floor(Math.random() * 150);
+  const waitFor = globalThis.__ebayLastCallAt + MIN_INTERVAL_MS - now;
+  if (waitFor > 0) await sleep(waitFor + jitter);
+  globalThis.__ebayLastCallAt = Date.now();
   const res = await fetch(url, { headers });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
@@ -166,4 +178,3 @@ run().catch((e) => {
 }).finally(async () => {
   await prisma.$disconnect();
 });
-
